@@ -1,0 +1,6 @@
+/dist
+.npmrc
+.nvmrc
+coverage
+.czrc
+**/.swcrc

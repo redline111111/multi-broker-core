@@ -1,0 +1,43 @@
+{
+  "name": "@redline11111/multi-broker-core",
+  "version": "1.0.0",
+  "description": "Universal multi-broker messaging core with pluggable transports",
+  "type": "module",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "default": "./dist/esm/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "npm run build:types && npm run build:esm && npm run build:cjs",
+    "build:types": "tsc -p tsconfig.types.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "demo:mem": "tsx src/examples/inmemory-demo.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "messaging",
+    "broker",
+    "rabbitmq",
+    "kafka",
+    "redis",
+    "nestjs"
+  ],
+  "author": "Ilya",
+  "license": "",
+  "devDependencies": {
+    "tsx": "^4.20.5",
+    "typescript": "^5.8.3",
+    "@types/node": "^24.3.0"
+  }
+}
