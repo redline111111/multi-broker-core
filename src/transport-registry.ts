@@ -1,6 +1,8 @@
 import { MessageTransport } from "./interfaces/message-transport";
 
-export type TransportFactory = () => Promise<MessageTransport> | MessageTransport;
+export type TransportFactory = () =>
+  | Promise<MessageTransport>
+  | MessageTransport;
 
 export class TransportRegistry {
   private readonly map = new Map<string, TransportFactory>();

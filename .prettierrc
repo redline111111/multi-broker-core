@@ -1,1 +1,6 @@
-"@payhost/prettier-config/node.js"
+{
+  "trailingComma": "es5",
+  "tabWidth": 2,
+  "semi": true,
+  "singleQuote": false
+}

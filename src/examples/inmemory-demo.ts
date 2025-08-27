@@ -10,22 +10,17 @@ import { ConsoleTracer } from "../observability/console-tracer.ts";
 async function main() {
   const transport = new InMemoryTransport();
 
-  const svc = new MessagingService(
-    () => transport,
-    { maxAttempts: 2, baseDelayMs: 100 },
-    {
-      transportName: "in-memory",
-      logger: new ConsoleLogger(),
-      tracer: new ConsoleTracer(),
-      metrics: new ConsoleMetrics(),
-      features: {
-        logging: true,
-        tracing: true,
-        metrics: true,
-      },
-    }
-  );
-
+const svc = new MessagingService(
+  () => transport,
+  { maxAttempts: 2, baseDelayMs: 100, factor: 2, jitterMs: 50 },
+  {
+    transportName: "in-memory",
+    logger: new ConsoleLogger(),
+    tracer: new ConsoleTracer(),
+    metrics: new ConsoleMetrics(),
+    features: { logging: true, tracing: true, metrics: true },
+  }
+);
   await svc.start();
 
   await svc.subscribe<{ hello: string }>(

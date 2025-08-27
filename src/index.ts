@@ -31,3 +31,17 @@ export * from "./models/process-status";
 export * from "./models/handler-result";
 export * from "./models/publish-options";
 export * from "./constants/health";
+export * from './utils/retry';
+export * from './errors';
+export * from './utils/circuit-breaker';
+export * from './utils/event-hub';
+export * from './transports/types';
+export * from './messaging/dlq';
+export * from './messaging/retry-delay';
+export * from './messaging/idempotency';
+export * from './messaging/payload-adapter';
+export * from './messaging/idempotency-key';
+export * from './outbox/types';
+export * from './outbox/outbox-dispatcher';
+export * from './inbox/inbox';
+

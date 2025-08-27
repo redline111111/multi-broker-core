@@ -5,21 +5,34 @@ import { RETRY_DEFAULTS } from "../constants/retry";
 
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
+
+function effective(policy?: RetryPolicy) {
+  return {
+    maxAttempts: policy?.maxAttempts ?? RETRY_DEFAULTS.MAX_ATTEMPTS,
+    baseDelayMs: policy?.baseDelayMs ?? RETRY_DEFAULTS.BASE_DELAY_MS,
+    factor: policy?.factor ?? RETRY_DEFAULTS.FACTOR,
+    jitterMs: policy?.jitterMs ?? RETRY_DEFAULTS.JITTER_MS,
+    maxDelayMs: policy?.maxDelayMs ?? RETRY_DEFAULTS.MAX_DELAY_MS,
+    backoff: policy?.backoff ?? RETRY_DEFAULTS.BACKOFF,
+    timeoutMs: policy?.timeoutMs ?? RETRY_DEFAULTS.TIMEOUT_MS,
+    retryOn: policy?.retryOn,
+    onRetryAttempt: policy?.onRetryAttempt,
+  } as const;
+}
+
 export async function withRetry(
   handler: () => Promise<HandlerResult>,
   policy?: RetryPolicy
 ): Promise<HandlerResult> {
-  const maxAttempts = policy?.maxAttempts ?? RETRY_DEFAULTS.MAX_ATTEMPTS;
-  const baseDelayMs = policy?.baseDelayMs ?? RETRY_DEFAULTS.BASE_DELAY_MS;
-  const factor = policy?.factor ?? RETRY_DEFAULTS.FACTOR;
-  const jitterMs = policy?.jitterMs ?? RETRY_DEFAULTS.JITTER_MS;
+  const cfg = effective(policy);
+  const started = Date.now();
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  for (let attempt = 1; attempt <= cfg.maxAttempts; attempt++) {
     try {
       const result = await handler();
 
       if (result.status === ProcessStatus.RETRY) {
-        if (attempt === maxAttempts) {
+        if (attempt === cfg.maxAttempts || (Date.now() - started) > cfg.timeoutMs) {
           return {
             status: ProcessStatus.DLQ,
             errorCode: result.errorCode ?? "RETRY_EXHAUSTED",
@@ -30,15 +43,19 @@ export async function withRetry(
             headers: result.headers,
           };
         }
-        const nextDelay = Math.floor(baseDelayMs * Math.pow(factor, attempt - 1) + Math.random() * jitterMs);
-        policy?.onRetryAttempt?.({ attempt, error: new Error("Handler requested RETRY"), nextDelayMs: nextDelay });
-        await sleep(nextDelay);
+        const delay = nextDelay(attempt, cfg);
+        cfg.onRetryAttempt?.({ attempt, error: new Error("Handler requested RETRY"), nextDelayMs: delay });
+        await sleep(delay);
         continue;
       }
 
       return result;
     } catch (error: any) {
-      if (attempt === maxAttempts) {
+      if (
+        attempt === cfg.maxAttempts ||
+        (Date.now() - started) > cfg.timeoutMs ||
+        (cfg.retryOn && !cfg.retryOn(error))
+      ) {
         return {
           status: ProcessStatus.DLQ,
           errorCode: "UNHANDLED_EXCEPTION",
@@ -48,11 +65,57 @@ export async function withRetry(
           dlqReason: "exception_max_attempts",
         };
       }
-      const nextDelay = Math.floor(baseDelayMs * Math.pow(factor, attempt - 1) + Math.random() * jitterMs);
-      policy?.onRetryAttempt?.({ attempt, error, nextDelayMs: nextDelay });
-      await sleep(nextDelay);
+      const delay = nextDelay(attempt, cfg);
+      cfg.onRetryAttempt?.({ attempt, error, nextDelayMs: delay });
+      await sleep(delay);
     }
   }
 
   return { status: ProcessStatus.DLQ, errorCode: "UNREACHABLE_STATE" };
+}
+
+function nextDelay(
+  attempt: number,
+  { baseDelayMs, factor, jitterMs, maxDelayMs, backoff }: Required<Pick<RetryPolicy,
+    'baseDelayMs'|'factor'|'jitterMs'|'maxDelayMs'|'backoff'
+  >>
+) {
+  const idx = attempt - 1;
+  let base =
+    backoff === 'fixed'
+      ? baseDelayMs
+      : backoff === 'exponential'
+      ? baseDelayMs * Math.pow(factor, idx)
+      : Math.round(
+          baseDelayMs * Math.pow(factor, idx) * (0.5 + Math.random())
+        );
+  base += Math.random() * jitterMs;
+  return Math.min(maxDelayMs, base);
+}
+
+export async function withRetryPromise<T>(
+  fn: () => Promise<T>,
+  policy?: RetryPolicy
+): Promise<T> {
+  const cfg = effective(policy);
+  const started = Date.now();
+
+  for (let attempt = 1; attempt <= cfg.maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const timeExceeded = (Date.now() - started) > cfg.timeoutMs;
+      const allowedByFilter = cfg.retryOn ? cfg.retryOn(error) : true;
+
+      if (attempt === cfg.maxAttempts || timeExceeded || !allowedByFilter) {
+        throw error;
+      }
+
+      const delay = nextDelay(attempt, cfg);
+      cfg.onRetryAttempt?.({ attempt, error, nextDelayMs: delay });
+      await sleep(delay);
+    }
+  }
+
+  throw new Error('withRetryPromise: unreachable');
 }

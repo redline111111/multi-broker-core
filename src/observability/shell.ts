@@ -47,8 +47,8 @@ export class ObservabilityShell {
       const res = await executor();
 
       if (this.d.features.metrics) {
-        this.d.metrics.incCounter(METRIC_NAMES.PUBLISH_TOTAL, labels);
-        this.d.metrics.observeHistogram(METRIC_NAMES.PUBLISH_LATENCY_MS, nowMs() - start, labels);
+        this.d.metrics.inc(METRIC_NAMES.PUBLISH_TOTAL, labels);
+        this.d.metrics.observe(METRIC_NAMES.PUBLISH_LATENCY_MS, nowMs() - start, labels);
       }
       if (this.d.features.logging) {
         this.d.logger.info("publish:success", { topic, correlationId, messageId, latencyMs: nowMs() - start });
@@ -56,7 +56,7 @@ export class ObservabilityShell {
 
       return res;
     } catch (error) {
-      if (this.d.features.metrics) this.d.metrics.incCounter(METRIC_NAMES.PUBLISH_ERRORS_TOTAL, labels);
+      if (this.d.features.metrics) this.d.metrics.inc(METRIC_NAMES.PUBLISH_ERRORS_TOTAL, labels);
       if (this.d.features.logging) this.d.logger.error("publish:error", { topic, correlationId, messageId, error });
       span?.recordException?.(error);
       throw error;
@@ -92,8 +92,8 @@ export class ObservabilityShell {
       const result = await executor();
 
       if (this.d.features.metrics) {
-        this.d.metrics.incCounter(METRIC_NAMES.CONSUME_TOTAL, labels);
-        this.d.metrics.observeHistogram(METRIC_NAMES.CONSUME_LATENCY_MS, nowMs() - start, labels);
+        this.d.metrics.inc(METRIC_NAMES.CONSUME_TOTAL, labels);
+        this.d.metrics.observe(METRIC_NAMES.CONSUME_LATENCY_MS, nowMs() - start, labels);
         onResultMetric?.(result);
       }
       if (this.d.features.logging) {
@@ -102,7 +102,7 @@ export class ObservabilityShell {
 
       return result;
     } catch (error) {
-      if (this.d.features.metrics) this.d.metrics.incCounter(METRIC_NAMES.CONSUME_ERRORS_TOTAL, labels);
+      if (this.d.features.metrics) this.d.metrics.inc(METRIC_NAMES.CONSUME_ERRORS_TOTAL, labels);
       if (this.d.features.logging) this.d.logger.error("consume:error", { topic, correlationId: meta.correlationId, messageId: meta.messageId, error });
       span?.recordException?.(error);
       throw error;
@@ -116,10 +116,10 @@ export class ObservabilityShell {
     const fullLabels = { ...labels, transport: this.d.transportName ?? "unknown" };
 
     switch (result.status) {
-      case ProcessStatus.ACK:   this.d.metrics.incCounter(METRIC_NAMES.ACK_TOTAL, fullLabels); break;
-      case ProcessStatus.NACK:  this.d.metrics.incCounter(METRIC_NAMES.NACK_TOTAL, fullLabels); break;
-      case ProcessStatus.RETRY: this.d.metrics.incCounter(METRIC_NAMES.RETRY_TOTAL, fullLabels); break;
-      case ProcessStatus.DLQ:   this.d.metrics.incCounter(METRIC_NAMES.DLQ_TOTAL, fullLabels); break;
+      case ProcessStatus.ACK:   this.d.metrics.inc(METRIC_NAMES.ACK_TOTAL, fullLabels); break;
+      case ProcessStatus.NACK:  this.d.metrics.inc(METRIC_NAMES.NACK_TOTAL, fullLabels); break;
+      case ProcessStatus.RETRY: this.d.metrics.inc(METRIC_NAMES.RETRY_TOTAL, fullLabels); break;
+      case ProcessStatus.DLQ:   this.d.metrics.inc(METRIC_NAMES.DLQ_TOTAL, fullLabels); break;
     }
   }
 }

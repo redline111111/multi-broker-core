@@ -27,7 +27,9 @@ export class MessagingService {
   private readonly defaultRetry?: RetryPolicy;
 
   constructor(
-    private readonly resolveTransport: () => Promise<MessageTransport> | MessageTransport,
+    private readonly resolveTransport: () =>
+      | Promise<MessageTransport>
+      | MessageTransport,
     defaultRetryPolicy?: RetryPolicy,
     observability?: ObservabilityOptions
   ) {
@@ -90,11 +92,6 @@ export class MessagingService {
     );
   }
 
-  /**
-   * Batch publish:
-   * - Если транспорт поддерживает publishBatch — используем его.
-   * - Иначе — публикуем поштучно, сохраняя наблюдаемость.
-   */
   async publishBatch<T>(
     topic: string,
     items: Array<{ payload: T; options?: PublishOptions }>,
@@ -103,14 +100,17 @@ export class MessagingService {
     commonOptions?: PublishOptions
   ) {
     if (!this.transport) throw new Error(ERROR_MESSAGES.NOT_CONNECTED);
-    const envelopes: Array<MessageEnvelope<T>> = items.map(({ payload, options }) => ({
-      id: crypto.randomUUID(),
-      timestamp: Date.now(),
-      source,
-      correlationId,
-      payload,
-      idempotencyKey: options?.idempotencyKey ?? commonOptions?.idempotencyKey,
-    }));
+    const envelopes: Array<MessageEnvelope<T>> = items.map(
+      ({ payload, options }) => ({
+        id: crypto.randomUUID(),
+        timestamp: Date.now(),
+        source,
+        correlationId,
+        payload,
+        idempotencyKey:
+          options?.idempotencyKey ?? commonOptions?.idempotencyKey,
+      })
+    );
 
     if (typeof this.transport.publishBatch === "function") {
       await this.shell.runPublish(
@@ -133,7 +133,11 @@ export class MessagingService {
         envelopes[i].id,
         source,
         async () => {
-          await this.transport!.publish(topic, envelopes[i], items[i].options ?? commonOptions);
+          await this.transport!.publish(
+            topic,
+            envelopes[i],
+            items[i].options ?? commonOptions
+          );
         },
         { delayMs: (items[i].options ?? commonOptions)?.delayMs }
       );
@@ -159,7 +163,10 @@ export class MessagingService {
     }
 
     const limit = effective.performance?.concurrency ?? undefined;
-    const sem = typeof limit === "number" && limit > 0 ? new Semaphore(limit) : new NoopSemaphore();
+    const sem =
+      typeof limit === "number" && limit > 0
+        ? new Semaphore(limit)
+        : new NoopSemaphore();
 
     await this.transport.subscribe<T>(topic, async (msg) => {
       await sem.acquire();
@@ -168,7 +175,11 @@ export class MessagingService {
 
         return this.shell.runConsume(
           topic,
-          { correlationId: validated.correlationId, messageId: validated.id, source: validated.source },
+          {
+            correlationId: validated.correlationId,
+            messageId: validated.id,
+            source: validated.source,
+          },
           () => handleWithIdempotencyAndRetry(validated, handler, effective),
           (result) => this.shell.updateConsumeResultMetrics(result, { topic })
         );
@@ -178,13 +189,15 @@ export class MessagingService {
     });
   }
 
-async healthCheck(): Promise<HealthReport> {
+  async healthCheck(): Promise<HealthReport> {
     const timestamp = Date.now();
     if (!this.transport) {
-      return { 
-        status: HealthStatus.UNHEALTHY, 
-        timestamp, 
-        details: { [HEALTH_DETAIL_KEYS.REASON]: HEALTH_REASONS.TRANSPORT_NOT_INITIALIZED } 
+      return {
+        status: HealthStatus.UNHEALTHY,
+        timestamp,
+        details: {
+          [HEALTH_DETAIL_KEYS.REASON]: HEALTH_REASONS.TRANSPORT_NOT_INITIALIZED,
+        },
       };
     }
 
@@ -199,19 +212,28 @@ async healthCheck(): Promise<HealthReport> {
         return {
           status: HealthStatus.UNHEALTHY,
           timestamp,
-          details: info ?? { [HEALTH_DETAIL_KEYS.REASON]: HEALTH_REASONS.TRANSPORT_REPORTED_UNHEALTHY },
+          details: info ?? {
+            [HEALTH_DETAIL_KEYS.REASON]:
+              HEALTH_REASONS.TRANSPORT_REPORTED_UNHEALTHY,
+          },
         };
       }
       return {
         status: HealthStatus.DEGRADED,
         timestamp,
-        details: { ...(info ?? {}), [HEALTH_DETAIL_KEYS.NOTE]: HEALTH_REASONS.TRANSPORT_NO_ISHEALTHY },
+        details: {
+          ...(info ?? {}),
+          [HEALTH_DETAIL_KEYS.NOTE]: HEALTH_REASONS.TRANSPORT_NO_ISHEALTHY,
+        },
       };
     } catch (error: any) {
       return {
         status: HealthStatus.UNHEALTHY,
         timestamp,
-        details: { [HEALTH_DETAIL_KEYS.ERROR]: error?.message ?? HEALTH_REASONS.HEALTH_CHECK_FAILED },
+        details: {
+          [HEALTH_DETAIL_KEYS.ERROR]:
+            error?.message ?? HEALTH_REASONS.HEALTH_CHECK_FAILED,
+        },  
       };
     }
   }

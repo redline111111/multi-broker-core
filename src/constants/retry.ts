@@ -1,6 +1,9 @@
 export const RETRY_DEFAULTS = {
-  MAX_ATTEMPTS: 3,     // включая первую попытку
-  BASE_DELAY_MS: 200,  // базовая задержка
-  FACTOR: 2,           // множитель экспоненты
-  JITTER_MS: 100,      // добавочный джиттер [0..JITTER_MS]
-} as const;
+  MAX_ATTEMPTS: 3,
+  BASE_DELAY_MS: 250,
+  FACTOR: 2,
+  JITTER_MS: 100,
+  MAX_DELAY_MS: 5000,
+  BACKOFF: 'exponential-jitter' as const,
+  TIMEOUT_MS: 30000,
+};
